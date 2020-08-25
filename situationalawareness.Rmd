@@ -15,7 +15,7 @@ output:
 body {
 color: "#796e66";
 background-color: black;
-zoom: 94%;
+zoom: 98%;
 }
 </style>
 
@@ -89,13 +89,27 @@ zoom: 94%;
 <!--   crossorigin=""></script> -->
 
 
-
-
+``` {js}
+// Inverse color of navigation bar.
+$('.navbar-inverse').removeClass('navbar-inverse').addClass('navbar-default');
+```
 
 
 
 ```{r setup, include=FALSE}
 # knitr::opts_chunk$set(echo = TRUE)
+
+
+##tasks:
+#add clustering of cases
+#add timeseries data on top right for case data
+##see discrepencies between douglas app and html
+##copy muryel for risk map
+##
+##
+##
+
+
 
 library(flexdashboard)
 library(DT)
@@ -118,6 +132,7 @@ library(rgeos)
 library(RCurl)
 library(googledrive)
 library(googlesheets4)
+library(plotly)
 options(scipen = 999) #so numbers dont display as scientfic notation
 register_google(key = "AIzaSyD1n2y7MnhppQ0WeVkV2gs-Y9sFtEfSuVI")
 
@@ -164,18 +179,18 @@ setwd("~/Desktop/geohackathon")
 #   spTransform(CRS("+proj=longlat +ellps=WGS84 +datum=WGS84")) ##transform shapefil to World Geodetic System 84 
 
 ##extracting brasil boundary from google drive
-be1 <- drive_get("bra_adm0.zip")
-temp<-tempfile(fileext="bra_adm0.zip")
-download.file("https://drive.google.com/file/d/1AYhxsczpY4yEp51DpNQRVRMbxwWW5acl/view?usp=sharing", temp) #file for brasil boundary
-dl <- drive_download(
-  as_id(be1$id), path = temp, overwrite = TRUE)
-brasil <- unzip(temp, exdir = tempdir()) %>%
-  cbind.data.frame(stringsAsFactors=F) %>% 
-  filter(row_number()==12L) %>% 
-  as.character() %>% 
-  readOGR() %>% 
-  spTransform(CRS("+proj=longlat +ellps=WGS84 +datum=WGS84")) ##transform shapefil to World Geodetic System 84 
-
+# be1 <- drive_get("bra_adm0.zip")
+# temp<-tempfile(fileext="bra_adm0.zip")
+# download.file("https://drive.google.com/file/d/1AYhxsczpY4yEp51DpNQRVRMbxwWW5acl/view?usp=sharing", temp) #file for brasil boundary
+# dl <- drive_download(
+#   as_id(be1$id), path = temp, overwrite = TRUE)
+# # brasil <- unzip(temp, exdir = tempdir()) %>%
+# #   cbind.data.frame(stringsAsFactors=F) %>% 
+# #   filter(row_number()==12L) %>% 
+# #   as.character() %>% 
+# #   readOGR() %>% 
+# #   spTransform(CRS("+proj=longlat +ellps=WGS84 +datum=WGS84")) ##transform shapefil to World Geodetic System 84 
+# 
 
 
 #shapefile quilombola community
@@ -209,10 +224,10 @@ datageo<-merge(quil, data, by.x="OBJECTID", by.y="OBJECTID",  stringsAsFactors =
 
 
 #randomly selected points as facility locations
-rpts<-spsample(quil, n = 30, "random") %>% ##random points; should be later read.csv
-  spTransform(CRS("+proj=longlat +ellps=WGS84 +datum=WGS84"))  ##transform shapefile to World Geodetic System 84 
-rpts<-SpatialPointsDataFrame(data = data.frame(ID=1:30), 
-                             coords = as.data.frame(rpts@coords[,1:2]))
+# rpts<-spsample(quil, n = 30, "random") %>% ##random points; should be later read.csv
+#   spTransform(CRS("+proj=longlat +ellps=WGS84 +datum=WGS84"))  ##transform shapefile to World Geodetic System 84 
+# rpts<-SpatialPointsDataFrame(data = data.frame(ID=1:30), 
+#                              coords = as.data.frame(rpts@coords[,1:2]))
 #csv facility information and location
 # facgeo<-read.csv("facgeo.csv") #facilities csv
 #convert to data.frame
@@ -239,8 +254,8 @@ cntyinfo = paste(
   lapply(htmltools::HTML)
 
 #label for the cases
-caseslabel<-paste("<b>", "# of Cases Confirmed: ", "</b>" , as.character(cdata$cases), " in ", cdata$Nom.x, " as of June 26, 4:02:47PM",
-                  "</br>", "<b>" , "Infection Rate per County: ", "</b>" , round((cdata$cases)/(cdata$X2018TOTPOP)*10,2) , " per 1,000 ppl", " (cases/county all pop)*1000", sep = "") %>%
+caseslabel<-paste("<b>", "# of Cases Confirmed: ", "</b>" , as.character(cdata$totcases), " in ", cdata$Nom.x, " as of June 26, 4:02:47PM",
+                  "</br>", "<b>" , "Infection Rate per Locality: ", "</b>" , round((cdata$totcases)/(cdata$totpop)*100,2) , " per pop", " (cases/locality pop)*00", sep = "") %>%
   lapply(htmltools::HTML)
 
 
@@ -253,30 +268,32 @@ facinfo = paste(
   "<u>","Current Numbers", "</u>", "<br>",
   
   "<b>","Patient Census: ", "</b>", facgeo$What.is.your.current.number.of..Patient.Census,"<br>",
-  "<b>","Bed Space Availability: ", "</b>", facgeo$What.is.your.current.number.of..Bed.Space.Availability,"<br>",
-  "<b>","Ventilators: ", "</b>", facgeo$How.many.ventilators.do.you.have....numerical.values.only...text,"<br>",
-  "<b>","ICU Beds: ", "</b>", facgeo$What.is.your.current.number.of..ICU.Beds,"<br>",
+  # "<b>","Bed Space Availability: ", "</b>", facgeo$What.is.your.current.number.of..Bed.Space.Availability,"<br>",
+  # "<b>","Ventilators: ", "</b>", facgeo$How.many.ventilators.do.you.have....numerical.values.only...text,"<br>",
+  # "<b>","ICU Beds: ", "</b>", facgeo$What.is.your.current.number.of..ICU.Beds,"<br>",
   
-  "<u>","Length of Time to Operate with Current Supply Chain ", "</u>", "<br>",
+  # "<u>","Length of Time to Operate with Current Supply Chain ", "</u>", "<br>",
+    "<u>","Supply Need for Next 8 Weeks", "</u>", "<br>",
+  "<b>","Supply Need Concern: " , "</b>", paste(round(facgeo$Please.indicate.supply.NEED.for.the.next.8weeks....5.being.least.concerned..1.being.most.concerned...ALL.SUPPLIES.AVERAGE.CODED, 0)),"<br>",
   
-  "<b>","Current Operational Normalcy | N95 Respirators: " , "</b>", facgeo$How.long.can.you.operate.with.your.current.supply.chain.for.the.following.items..N95.Respirators,"<br>",
-  "<b>","Current Operational Normalcy | Surgical Masks: " , "</b>", facgeo$How.long.can.you.operate.with.your.current.supply.chain.for.the.following.items..Surgical.Masks,"<br>",
-  "<b>","Current Operational Normalcy | Face Shields/Eye Gear: " , "</b>", facgeo$How.long.can.you.operate.with.your.current.supply.chain.for.the.following.items..Face.Shields.Eye.Gear,"<br>",
-  "<b>","Current Operational Normalcy | Gowns: " , "</b>", facgeo$How.long.can.you.operate.with.your.current.supply.chain.for.the.following.items..Gowns,"<br>",
-  "<b>","Current Operational Normalcy | Gloves: " , "</b>", facgeo$How.long.can.you.operate.with.your.current.supply.chain.for.the.following.items..Gloves,"<br>",
-  
-  "<u>","Staffing ", "</u>", "<br>",
-  
-  "<b>","Current Situation | Staffing MDs: ", "</b>", facgeo$What.best.describes.your.current.staffing.situations....5.being.most.ready..1.being.least.ready...MD.staff,"<br>",
-  "<b>","Current Situation | Staffing RNs: ", "</b>", facgeo$What.best.describes.your.current.staffing.situations....5.being.most.ready..1.being.least.ready...RN.Staff,"<br>",
-  "<b>","Plans for Expanding Staff: ", "</b>", facgeo$What.are.your.plans.for.expanding.staff.in.the.event.of.a.surge.and.or.workforce.shortage...text,"<br>",
-  
-  "<u>","Bed Space Availability ", "</u>", "<br>",
-  
-  "<b>","ICU Beds Situation: ", "</b>", facgeo$What.is.your.space.situation...5.being.most.capable..1.being.least.capable...ICU.Beds,"<br>",
-  "<b>","ICU Beds: ", "</b>", facgeo$What.is.your.current.number.of..ICU.Beds,"<br>",
-  "<b>","NP/Isolation Beds Situation: ", "</b>", facgeo$What.is.your.space.situation...5.being.most.capable..1.being.least.capable...NP.or.Isolation.Beds,"<br>",
-  
+    
+  # "<b>","Current Operational Normalcy | N95 Respirators: " , "</b>", facgeo$How.long.can.you.operate.with.your.current.supply.chain.for.the.following.items..N95.Respirators,"<br>",
+  # "<b>","Current Operational Normalcy | Surgical Masks: " , "</b>", facgeo$How.long.can.you.operate.with.your.current.supply.chain.for.the.following.items..Surgical.Masks,"<br>",
+  # "<b>","Current Operational Normalcy | Face Shields/Eye Gear: " , "</b>", facgeo$How.long.can.you.operate.with.your.current.supply.chain.for.the.following.items..Face.Shields.Eye.Gear,"<br>",
+  # "<b>","Current Operational Normalcy | Gowns: " , "</b>", facgeo$How.long.can.you.operate.with.your.current.supply.chain.for.the.following.items..Gowns,"<br>",
+  # "<b>","Current Operational Normalcy | Gloves: " , "</b>", facgeo$How.long.can.you.operate.with.your.current.supply.chain.for.the.following.items..Gloves,"<br>",
+  # 
+  # "<u>","Staffing ", "</u>", "<br>",
+  # "<b>","Current Situation | Staffing MDs: ", "</b>", facgeo$What.best.describes.your.current.staffing.situations....5.being.most.ready..1.being.least.ready...MD.staff,"<br>",
+  # "<b>","Current Situation | Staffing RNs: ", "</b>", facgeo$What.best.describes.your.current.staffing.situations....5.being.most.ready..1.being.least.ready...RN.Staff,"<br>",
+  # "<b>","Plans for Expanding Staff: ", "</b>", facgeo$What.are.your.plans.for.expanding.staff.in.the.event.of.a.surge.and.or.workforce.shortage...text,"<br>",
+  # 
+  # "<u>","Bed Space Availability ", "</u>", "<br>",
+  # 
+  # "<b>","ICU Beds Situation: ", "</b>", facgeo$What.is.your.space.situation...5.being.most.capable..1.being.least.capable...ICU.Beds,"<br>",
+  # "<b>","ICU Beds: ", "</b>", facgeo$What.is.your.current.number.of..ICU.Beds,"<br>",
+  # "<b>","NP/Isolation Beds Situation: ", "</b>", facgeo$What.is.your.space.situation...5.being.most.capable..1.being.least.capable...NP.or.Isolation.Beds,"<br>",
+  # 
   "<u>","Other Needs ", "</u>", "<br>",
   "<b>","Other Needs: ", "</b>", facgeo$Please.describe.any.other.needs.you.may.have.at.this.time.to.handle.a.potential.surge...text,"</br>", 
   sep = "") %>%
@@ -284,52 +301,55 @@ facinfo = paste(
 
 
 #colour pallette
-pal1<-  colorNumeric(palette = "Reds", domain = cdata$X2018TOTPOP, na.color="transparent")
+pal1<-  colorNumeric(palette = "Reds", domain = cdata$totpop, na.color="transparent")
 
-facneed8pal <- colorFactor(palette = 'RdYlGn', facgeo$Please.indicate.supply.NEED.for.the.next.8weeks....5.being.least.concerned..1.being.most.concerned...ALL.SUPPLIES.AVERAGE.CODEDcut, rev=T)
 
-palcurropnormal<- colorFactor(palette = 'RdYlGn', domain = levels(facgeo$How.long.can.you.operate.with.your.current.supply.chain.for.the.following.items..Surgical.Masks))
+
+# palcurropnormal<- colorFactor(palette = 'RdYlGn', domain = levels(facgeo$How.long.can.you.operate.with.your.current.supply.chain.for.the.following.items..Surgical.Masks))
 
 #colour pal for cases circl
-casespal <- colorFactor(palette = colorRampPalette(c("red", "white")), domain=cdata$cases,  rev=T)
+casespal <- colorFactor(palette = colorRampPalette(c("red", "white")), domain=cdata$totcases,  rev=T)
 
 #colour for bed availability
-palavailability <- colorFactor('RdYlGn', domain = (facgeo$What.is.your.current.number.of..Bed.Space.Availability), rev= F)
-
-#colour for faciltiy need concern in next 8 weeks
-facneed8pal <- colorFactor(palette = 'RdYlGn', facgeo$Please.indicate.supply.NEED.for.the.next.8weeks....5.being.least.concerned..1.being.most.concerned...ALL.SUPPLIES.AVERAGE.CODEDcut, rev=T)
-
-##Bed space availability cuts
-facgeo$What.is.your.current.number.of..Bed.Space.Availabilitycut <-
-  cut(
-    facgeo$What.is.your.current.number.of..Bed.Space.Availability,
-    breaks =  quantile(
-      facgeo$What.is.your.current.number.of..Bed.Space.Availability,
-      names = TRUE,
-      type = 4
-    ),
-    # c(round(quantile(facgeo$What.is.your.current.number.of..Patient.Census)[1,1:5])),
-    include.lowest = F
-    # labels = rev(c('0-2 pts',
-    #                '3-7 pts',
-    #                '8-16 pts',
-    #                '17-'))
-  )
-
-
-
+# palavailability <- colorFactor('RdYlGn', domain = (facgeo$What.is.your.current.number.of..Bed.Space.Availability), rev= F)
 
 # #Concern about supplies for next 8 weeks  cuts ----------------------------------------------------------
 facgeo$Please.indicate.supply.NEED.for.the.next.8weeks....5.being.least.concerned..1.being.most.concerned...ALL.SUPPLIES.AVERAGE.CODEDcut <-
   cut(
-    facgeo$Please.indicate.supply.NEED.for.the.next.8weeks....5.being.least.concerned..1.being.most.concerned...ALL.SUPPLIES.AVERAGE.CODED,
-    rev(c(0, 1, 2, 3, 4, 5)), include.lowest = F,
-    labels = rev(c(
+    round(facgeo$Please.indicate.supply.NEED.for.the.next.8weeks....5.being.least.concerned..1.being.most.concerned...ALL.SUPPLIES.AVERAGE.CODED,0),
+    c(0, 1, 2, 3, 4, 5), include.lowest = F,
+    labels = c(
       "Exhausted all supply options  (1)",
       "No supply chain, reuse, expired products, resource requests  (2)",
       "Difficulty with supply chain  (3)" ,
-      "Need resource requests through LHD and MOAC  (4)" ,
-      "Continuing to procure through regular process  (5)" )))
+      "Need resource requests through Local Health Dept. or Gov't  (4)" ,
+      "Continuing to procure through regular process  (5)" ))
+
+
+#colour for faciltiy need concern in next 8 weeks
+facneed8pal <- colorFactor(palette = 'RdYlGn', facgeo$Please.indicate.supply.NEED.for.the.next.8weeks....5.being.least.concerned..1.being.most.concerned...ALL.SUPPLIES.AVERAGE.CODEDcut, rev=F)
+
+##Bed space availability cuts
+# facgeo$What.is.your.current.number.of..Bed.Space.Availabilitycut <-
+#   cut(
+#     facgeo$What.is.your.current.number.of..Bed.Space.Availability,
+#     breaks =  quantile(
+#       facgeo$What.is.your.current.number.of..Bed.Space.Availability,
+#       names = TRUE,
+#       type = 4
+#     ),
+#     # c(round(quantile(facgeo$What.is.your.current.number.of..Patient.Census)[1,1:5])),
+#     include.lowest = F
+#     # labels = rev(c('0-2 pts',
+#     #                '3-7 pts',
+#     #                '8-16 pts',
+#     #                '17-'))
+#   )
+
+
+
+
+
 
 
 
@@ -338,21 +358,21 @@ facgeo$Please.indicate.supply.NEED.for.the.next.8weeks....5.being.least.concerne
 
 
 ##Bed space availability cuts
-facgeo$What.is.your.current.number.of..Bed.Space.Availabilitycut <-
-  cut(
-    facgeo$What.is.your.current.number.of..Bed.Space.Availability,
-    breaks =  quantile(
-      facgeo$What.is.your.current.number.of..Bed.Space.Availability,
-      names = TRUE,
-      type = 4
-    ),
-    # c(round(quantile(facgeo$What.is.your.current.number.of..Patient.Census)[1,1:5])),
-    include.lowest = F
-    # labels = rev(c('0-2 pts',
-    #                '3-7 pts',
-    #                '8-16 pts',
-    #                '17-'))
-  )
+# facgeo$What.is.your.current.number.of..Bed.Space.Availabilitycut <-
+#   cut(
+#     facgeo$What.is.your.current.number.of..Bed.Space.Availability,
+#     breaks =  quantile(
+#       facgeo$What.is.your.current.number.of..Bed.Space.Availability,
+#       names = TRUE,
+#       type = 4
+#     ),
+#     # c(round(quantile(facgeo$What.is.your.current.number.of..Patient.Census)[1,1:5])),
+#     include.lowest = F
+#     # labels = rev(c('0-2 pts',
+#     #                '3-7 pts',
+#     #                '8-16 pts',
+#     #                '17-'))
+#   )
 
 
 #map title
@@ -386,10 +406,10 @@ title <- tags$div(
 ```
 
 
-Column {data-width=550}
+Column {data-width=450}
 -----------------------------------------------------------------------
 
-### Cases + Facilities + Risk Factors
+### Cases + Facilities + Risk
 
 ```{r}
 
@@ -415,16 +435,16 @@ leaflet (cdata) %>%
       direction = "auto"),
     group = "<b>Quilombola Community Boundary</b>") %>% 
   
-  addPolygons(
-    data=brasil, 
-    group = "<b>Brasil Boundary</b>") %>%
+  # addPolygons(
+  #   data=brasil, 
+  #   group = "<b>Brasil Boundary</b>") %>%
   
   addMarkers(
     data = cdata,
     lng = cdata$x,
     lat = cdata$y,
     # clusterOptions = markerClusterOptions(freezeAtZoom = 4.5),
-    icon = NULL,
+    # icon = "blue", 
     popup = NULL,
     popupOptions = T,
     label = cntyinfo,
@@ -438,22 +458,22 @@ leaflet (cdata) %>%
     group =  "<b>Brief Summary of Polygon</b>") %>% 
   
   
-  addCircleMarkers(
-    color = "red", 
-   lng =  rpts@coords[,1], 
-   lat= rpts@coords[,2], ##coords
-
-    group="<b>Randomly Selected Locations</b>") %>% 
+  # addCircleMarkers(
+  #   color = "red", 
+  #  lng =  rpts@coords[,1], 
+  #  lat= rpts@coords[,2], ##coords
+  # 
+  #   group="<b>Randomly Selected Locations</b>") %>% 
   
   
   
   
   
-  addCircleMarkers(lng = cdata$x,
-                   lat= cdata$y,
-                   data=cdata$cases,
-    color = "yellow", 
-    group = "<b>Community Need</b>") %>%
+  # addCircleMarkers(lng = cdata$x,
+  #                  lat= cdata$y,
+  #                  data=cdata$cases,
+  #   color = "yellow", 
+  #   group = "<b>Community Need</b>") %>%
 
 
   
@@ -461,9 +481,9 @@ leaflet (cdata) %>%
     data = cdata,
     lng = cdata$x,
     lat = cdata$y,
-    color = ~ casespal(cdata$cases),
-    popup = as.character(cdata$cases),
-    radius = ~ sqrt(cdata$cases) * 1.5,
+    color = ~ casespal(cdata$totcases),
+    popup = as.character(cdata$totcases),
+    radius = ~ sqrt(cdata$totcases) * 1.5,
     #edited the size of circles for cases
     weight = .5,
     label = caseslabel,
@@ -474,7 +494,7 @@ leaflet (cdata) %>%
     ),
     opacity = 0.95,
     # color = ~casespal(pts@data$V3),
-    group =     "<b>Cases Per County</b>"
+    group =     "<b>Cases Per Locality</b>"
   ) %>% 
   
 
@@ -482,7 +502,7 @@ leaflet (cdata) %>%
     data = cdata,
     lng = cdata$x,
     lat = cdata$y,
-    label =  as.character(cdata$cases),
+    label =  as.character(cdata$totcases),
     # label = "Label w/ custom CSS style",
     labelOptions = labelOptions(
       noHide = T,
@@ -496,7 +516,7 @@ leaflet (cdata) %>%
         "font-size" = "12px"
         # "border-color" = "rgba(0,0,0,0.5)"
       )),
-    group= "<b>Cases Per County</b>" ) %>%  
+    group= "<b>Cases Per Locality</b>" ) %>%  
   
   
   
@@ -533,58 +553,58 @@ addMarkers(
 
 
 # ##operational normalacy current with supplies ---------------------------
-addCircleMarkers(data=facgeo,
-                 lng=facgeo$lon, 
-                 lat = facgeo$lat,
-                 radius = 10,
-                 color = ~palcurropnormal(facgeo$How.long.can.you.operate.with.your.current.supply.chain.for.the.following.items..N95.Respirators),
-                 stroke = FALSE, 
-                 fillOpacity = 0.5,
-                 # clusterOptions = markerClusterOptions(freezeAtZoom = 12.5),
-                 group= "Current Operational Normalcy | N95 Respirators") %>% 
+# addCircleMarkers(data=facgeo,
+#                  lng=facgeo$lon, 
+#                  lat = facgeo$lat,
+#                  radius = 10,
+#                  color = ~palcurropnormal(facgeo$How.long.can.you.operate.with.your.current.supply.chain.for.the.following.items..N95.Respirators),
+#                  stroke = FALSE, 
+#                  fillOpacity = 0.5,
+#                  # clusterOptions = markerClusterOptions(freezeAtZoom = 12.5),
+#                  group= "Current Operational Normalcy | N95 Respirators") %>% 
   
   
-  addCircleMarkers(data=facgeo,
-                   lng=facgeo$lon, 
-                   lat = facgeo$lat,
-                   radius = 10,
-                   color = ~palcurropnormal(facgeo$How.long.can.you.operate.with.your.current.supply.chain.for.the.following.items..Surgical.Masks),
-                   stroke = FALSE, 
-                   fillOpacity = 0.5,
-                   # clusterOptions = markerClusterOptions(freezeAtZoom = 12.5),
-                   group= "Current Operational Normalcy | Surgical Masks") %>% 
+  # addCircleMarkers(data=facgeo,
+  #                  lng=facgeo$lon, 
+  #                  lat = facgeo$lat,
+  #                  radius = 10,
+  #                  color = ~palcurropnormal(facgeo$How.long.can.you.operate.with.your.current.supply.chain.for.the.following.items..Surgical.Masks),
+  #                  stroke = FALSE, 
+  #                  fillOpacity = 0.5,
+  #                  # clusterOptions = markerClusterOptions(freezeAtZoom = 12.5),
+  #                  group= "Current Operational Normalcy | Surgical Masks") %>% 
   
   
-  addCircleMarkers(data=facgeo,
-                   lng=facgeo$lon, 
-                   lat = facgeo$lat,
-                   radius = 10,
-                   color = ~palcurropnormal(facgeo$How.long.can.you.operate.with.your.current.supply.chain.for.the.following.items..Face.Shields.Eye.Gear),
-                   stroke = FALSE, 
-                   fillOpacity = 0.5,
-                   # clusterOptions = markerClusterOptions(freezeAtZoom = 12.5),
-                   group= "Current Operational Normalcy | Face Shield/Eye Gear") %>% 
-  
-  addCircleMarkers(data=facgeo,
-                   lng=facgeo$lon, 
-                   lat = facgeo$lat,
-                   radius = 10,
-                   color = ~palcurropnormal(facgeo$How.long.can.you.operate.with.your.current.supply.chain.for.the.following.items..Gowns),
-                   stroke = FALSE, 
-                   fillOpacity = 0.5,
-                   # clusterOptions = markerClusterOptions(freezeAtZoom = 12.5),
-                   group= "Current Operational Normalcy | Gowns") %>% 
-  
-  
-  addCircleMarkers(data=facgeo,
-                   lng=facgeo$lon, 
-                   lat = facgeo$lat,
-                   radius = 10,
-                   color = ~palcurropnormal(facgeo$How.long.can.you.operate.with.your.current.supply.chain.for.the.following.items..Gloves),
-                   stroke = FALSE, 
-                   fillOpacity = 0.5,
-                   # clusterOptions = markerClusterOptions(freezeAtZoom = 12.5),
-                   group= "Current Operational Normalcy | Gloves") %>% 
+  # addCircleMarkers(data=facgeo,
+  #                  lng=facgeo$lon, 
+  #                  lat = facgeo$lat,
+  #                  radius = 10,
+  #                  color = ~palcurropnormal(facgeo$How.long.can.you.operate.with.your.current.supply.chain.for.the.following.items..Face.Shields.Eye.Gear),
+  #                  stroke = FALSE, 
+  #                  fillOpacity = 0.5,
+  #                  # clusterOptions = markerClusterOptions(freezeAtZoom = 12.5),
+  #                  group= "Current Operational Normalcy | Face Shield/Eye Gear") %>% 
+  # 
+  # addCircleMarkers(data=facgeo,
+  #                  lng=facgeo$lon, 
+  #                  lat = facgeo$lat,
+  #                  radius = 10,
+  #                  color = ~palcurropnormal(facgeo$How.long.can.you.operate.with.your.current.supply.chain.for.the.following.items..Gowns),
+  #                  stroke = FALSE, 
+  #                  fillOpacity = 0.5,
+  #                  # clusterOptions = markerClusterOptions(freezeAtZoom = 12.5),
+  #                  group= "Current Operational Normalcy | Gowns") %>% 
+  # 
+  # 
+  # addCircleMarkers(data=facgeo,
+  #                  lng=facgeo$lon, 
+  #                  lat = facgeo$lat,
+  #                  radius = 10,
+  #                  color = ~palcurropnormal(facgeo$How.long.can.you.operate.with.your.current.supply.chain.for.the.following.items..Gloves),
+  #                  stroke = FALSE, 
+  #                  fillOpacity = 0.5,
+  #                  # clusterOptions = markerClusterOptions(freezeAtZoom = 12.5),
+  #                  group= "Current Operational Normalcy | Gloves") %>% 
   
   
   
@@ -592,50 +612,50 @@ addCircleMarkers(data=facgeo,
   # ##Availability of Supplies ---------------------------
 
 
-
-addLabelOnlyMarkers(
-  data = facgeo,
-  lng = facgeo$lon,
-  lat = facgeo$lat,
-  label =  ~ as.character(facgeo$What.is.your.current.number.of..Bed.Space.Availability),
-  # label = "Label w/ custom CSS style",
-  labelOptions = labelOptions(
-    noHide = T,
-    direction = 'right',
-    textOnly = T,  
-    style = list(
-      "color" = "white",
-      # "font-family" = "serif",
-      # "font-style" = "italic",
-      # "box-shadow" = "3px 3px rgba(0,0,0,0.25)",
-      "font-size" = "12px"
-      # "border-color" = "rgba(0,0,0,0.5)"
-    )),
-  group= "Current Availability | Bed Space"
-) %>% 
+# 
+# addLabelOnlyMarkers(
+#   data = facgeo,
+#   lng = facgeo$lon,
+#   lat = facgeo$lat,
+#   label =  ~ as.character(facgeo$What.is.your.current.number.of..Bed.Space.Availability),
+#   # label = "Label w/ custom CSS style",
+#   labelOptions = labelOptions(
+#     noHide = T,
+#     direction = 'right',
+#     textOnly = T,  
+#     style = list(
+#       "color" = "white",
+#       # "font-family" = "serif",
+#       # "font-style" = "italic",
+#       # "box-shadow" = "3px 3px rgba(0,0,0,0.25)",
+#       "font-size" = "12px"
+#       # "border-color" = "rgba(0,0,0,0.5)"
+#     )),
+#   group= "Current Availability | Bed Space"
+# ) %>% 
   
   
   
-  addLabelOnlyMarkers(
-    data = facgeo,
-    lng = facgeo$lon,
-    lat = facgeo$lat,
-    label =  ~ as.character(facgeo$What.is.your.current.number.of..ICU.Beds),
-    # label = "Label w/ custom CSS style",
-    labelOptions = labelOptions(
-      noHide = T,
-      direction = 'left',
-      textOnly = T,
-      style = list(
-        "color" = "red",
-        # "font-family" = "serif",
-        # "font-style" = "italic",
-        # "box-shadow" = "3px 3px rgba(0,0,0,0.25)",
-        "font-size" = "12px"
-        # "border-color" = "rgba(0,0,0,0.5)"
-      )),
-    group= "Current Availability | ICU Beds"
-  ) %>%
+  # addLabelOnlyMarkers(
+  #   data = facgeo,
+  #   lng = facgeo$lon,
+  #   lat = facgeo$lat,
+  #   label =  ~ as.character(facgeo$What.is.your.current.number.of..ICU.Beds),
+  #   # label = "Label w/ custom CSS style",
+  #   labelOptions = labelOptions(
+  #     noHide = T,
+  #     direction = 'left',
+  #     textOnly = T,
+  #     style = list(
+  #       "color" = "red",
+  #       # "font-family" = "serif",
+  #       # "font-style" = "italic",
+  #       # "box-shadow" = "3px 3px rgba(0,0,0,0.25)",
+  #       "font-size" = "12px"
+  #       # "border-color" = "rgba(0,0,0,0.5)"
+  #     )),
+  #   group= "Current Availability | ICU Beds"
+  # ) %>%
   
   #################markers for each health facility by colour
   
@@ -648,7 +668,7 @@ addLabelOnlyMarkers(
     ),
     # popup = facgeo$Popup,
     radius = ~sqrt(facgeo$Please.indicate.supply.NEED.for.the.next.8weeks....5.being.least.concerned..1.being.most.concerned...ALL.SUPPLIES.AVERAGE.CODED * 50),
-    group =            "<b>Facility Supply Need Concern for Next 8 Weeks</b>"
+    group = "<b>Facility Supply Need Concern for Next 8 Weeks</b>"
   ) %>%
   
   
@@ -658,20 +678,21 @@ addLabelOnlyMarkers(
 
     
     # "<b>Quilombola Community Boundary</b>",
-    "<b>Brasil Boundary</b>",
+    # "<b>Brasil Boundary</b>",
     "<b>Brief Summary of Polygon</b>",
-    "<b>Randomly Selected Locations</b>",
-    "<b>Community Need</b>",
-    "<b>Cases Per County</b>",
+    # "<b>Randomly Selected Locations</b>",
+    # "<b>Community Need</b>",
+    "<b>Cases Per Locality</b>",
     "<b>Facility Locations w/ Brief Summary</b>",
-    "<b>Facility Supply Need Concern for Next 8 Weeks</b>",
-    "Current Operational Normalcy | N95 Respirators",
-    "Current Operational Normalcy | Surgical Masks",
-    "Current Operational Normalcy | Face Shield/Eye Gear",
-    "Current Operational Normalcy | Gowns",
-    "Current Operational Normalcy | Gloves",
-    "Current Availability | Bed Space",
-    "Current Availability | ICU Beds")) %>%
+    "<b>Facility Supply Need Concern for Next 8 Weeks</b>"
+    # ,"Current Operational Normalcy | N95 Respirators"
+    #, "Current Operational Normalcy | Surgical Masks",
+    # "Current Operational Normalcy | Face Shield/Eye Gear",
+    # "Current Operational Normalcy | Gowns",
+    # "Current Operational Normalcy | Gloves",
+    # "Current Availability | Bed Space",
+    # "Current Availability | ICU Beds"
+    )) %>%
   
   
   
@@ -720,82 +741,82 @@ addScaleBar() %>%
   
 
   
-  #Legend Population per County
+  #Legend Population per Locality
   addLegend(
     position = "topleft",
     pal = pal1,
-    values = cdata$X2018TOTPOP,
+    values = cdata$totpop,
     # labels = ~pal1,
     title = "Population 2018",
     opacity = 0.35,
     group =  "Population 2018 Est. (%)"
   ) %>%
   #legend color for current operational normalcy; N95 Respirators
-  addLegend(
-    position = 'topleft',
-    pal = palcurropnormal,
-    values = levels(facgeo$How.long.can.you.operate.with.your.current.supply.chain.for.the.following.items..N95.Respirators),
-    title = "<b>Operational Normalcy Given Current Supply: N95 Respirators </b> </br><i>LengthofTime </i> </br>",
-    opacity = .75,
-    group =     "Current Operational Normalcy | N95 Respirators"
-  ) %>%
+  # addLegend(
+  #   position = 'topleft',
+  #   pal = palcurropnormal,
+  #   values = levels(facgeo$How.long.can.you.operate.with.your.current.supply.chain.for.the.following.items..N95.Respirators),
+  #   title = "<b>Operational Normalcy Given Current Supply: N95 Respirators </b> </br><i>LengthofTime </i> </br>",
+  #   opacity = .75,
+  #   group =     "Current Operational Normalcy | N95 Respirators"
+  # ) %>%
   
   
-  #legend color for current operational normalcy; Surgical Masks
-  addLegend(
-    position = "topleft",
-    pal = palcurropnormal,
-    values = facgeo$How.long.can.you.operate.with.your.current.supply.chain.for.the.following.items..Surgical.Masks,
-    title = "<b>Operational Normalcy Given Current Supply: Surgical Masks </b> </br><i>LengthofTime </i> </br>",  
-    opacity = .75,
-    group =     "Current Operational Normalcy | Surgical Masks"
-  ) %>% 
-  
-  
-  #legend color for current operational normalcy; Face Shields/Eye Gear
-  addLegend(
-    position = "topleft",
-    pal = palcurropnormal,
-    values = facgeo$How.long.can.you.operate.with.your.current.supply.chain.for.the.following.items..Surgical.Masks,
-    title = "<b>Operational Normalcy Given Current Supply: Face Shields/Eye Gear </b> </br><i>LengthofTime </i> </br>",  
-    opacity = .75,
-    group =     "Current Operational Normalcy | Face Shield/Eye Gear"
-  ) %>% 
-  
-  
-  
-  #legend color for current operational normalcy; Gowns
-  addLegend(
-    position = "topleft",
-    pal = palcurropnormal,
-    values = facgeo$How.long.can.you.operate.with.your.current.supply.chain.for.the.following.items..Surgical.Masks,
-    title = "<b>Operational Normalcy Given Current Supply: Gowns </b> </br><i>LengthofTime </i> </br>",  
-    opacity = .75,
-    group =     "Current Operational Normalcy | Gowns"
-  ) %>% 
-  
-  
-  
-  
-  #legend color for current operational normalcy; Gloves
-  addLegend(
-    position = "topleft",
-    pal = palcurropnormal,
-    values = facgeo$How.long.can.you.operate.with.your.current.supply.chain.for.the.following.items..Surgical.Masks,
-    title = "<b>Operational Normalcy Given Current Supply: Gloves </b> </br><i>LengthofTime </i> </br>",  
-    opacity = .75,
-    group =     "Current Operational Normalcy | Gloves"
-  ) %>% 
-  
-  
+  # #legend color for current operational normalcy; Surgical Masks
+  # addLegend(
+  #   position = "topleft",
+  #   pal = palcurropnormal,
+  #   values = facgeo$How.long.can.you.operate.with.your.current.supply.chain.for.the.following.items..Surgical.Masks,
+  #   title = "<b>Operational Normalcy Given Current Supply: Surgical Masks </b> </br><i>LengthofTime </i> </br>",  
+  #   opacity = .75,
+  #   group =     "Current Operational Normalcy | Surgical Masks"
+  # ) %>% 
+  # 
+  # 
+  # #legend color for current operational normalcy; Face Shields/Eye Gear
+  # addLegend(
+  #   position = "topleft",
+  #   pal = palcurropnormal,
+  #   values = facgeo$How.long.can.you.operate.with.your.current.supply.chain.for.the.following.items..Surgical.Masks,
+  #   title = "<b>Operational Normalcy Given Current Supply: Face Shields/Eye Gear </b> </br><i>LengthofTime </i> </br>",  
+  #   opacity = .75,
+  #   group =     "Current Operational Normalcy | Face Shield/Eye Gear"
+  # ) %>% 
+  # 
+  # 
+  # 
+  # #legend color for current operational normalcy; Gowns
+  # addLegend(
+  #   position = "topleft",
+  #   pal = palcurropnormal,
+  #   values = facgeo$How.long.can.you.operate.with.your.current.supply.chain.for.the.following.items..Surgical.Masks,
+  #   title = "<b>Operational Normalcy Given Current Supply: Gowns </b> </br><i>LengthofTime </i> </br>",  
+  #   opacity = .75,
+  #   group =     "Current Operational Normalcy | Gowns"
+  # ) %>% 
+  # 
+  # 
+  # 
+  # 
+  # #legend color for current operational normalcy; Gloves
+  # addLegend(
+  #   position = "topleft",
+  #   pal = palcurropnormal,
+  #   values = facgeo$How.long.can.you.operate.with.your.current.supply.chain.for.the.following.items..Surgical.Masks,
+  #   title = "<b>Operational Normalcy Given Current Supply: Gloves </b> </br><i>LengthofTime </i> </br>",  
+  #   opacity = .75,
+  #   group =     "Current Operational Normalcy | Gloves"
+  # ) %>% 
+  # 
+  # 
   #legend color for average facility need CONCERN for next 8 weeks
   addLegend(
-    position = "topleft",
+    position = "bottomright",
     pal = facneed8pal,
     values = facgeo$Please.indicate.supply.NEED.for.the.next.8weeks....5.being.least.concerned..1.being.most.concerned...ALL.SUPPLIES.AVERAGE.CODEDcut,
     title = "<b>Facility Supply Need Concern for Next 8 Weeks </b> </br>  <i>Averaged </i> </br>",
     opacity = .75,
-    group =         "<b>Facility Supply Need Concern for Next 8 Weeks </b>"
+    group = "<b>Facility Supply Need Concern for Next 8 Weeks</b>"
   ) %>% 
 
 
@@ -808,20 +829,20 @@ addLayersControl(
     # "Satellite Locations",
 
     "<b>Quilombola Community Boundary</b>",
-    "<b>Brasil Boundary</b>",
+    # "<b>Brasil Boundary</b>",
     "<b>Brief Summary of Polygon</b>",
-    "<b>Randomly Selected Locations</b>",
-    "<b>Community Need</b>",
-    "<b>Cases Per County</b>",
+    # "<b>Randomly Selected Locations</b>",
+    # "<b>Community Need</b>",
+    "<b>Cases Per Locality</b>",
     "<b>Facility Locations w/ Brief Summary</b>",
-    "<b>Facility Supply Need Concern for Next 8 Weeks</b>",
-    "Current Operational Normalcy | N95 Respirators",
-    "Current Operational Normalcy | Surgical Masks",
-    "Current Operational Normalcy | Face Shield/Eye Gear",
-    "Current Operational Normalcy | Gowns",
-    "Current Operational Normalcy | Gloves",
-    "Current Availability | Bed Space",
-    "Current Availability | ICU Beds"
+    "<b>Facility Supply Need Concern for Next 8 Weeks</b>"
+    # "Current Operational Normalcy | N95 Respirators"
+    # ,"Current Operational Normalcy | Surgical Masks",
+    # "Current Operational Normalcy | Face Shield/Eye Gear",
+    # "Current Operational Normalcy | Gowns",
+    # "Current Operational Normalcy | Gloves",
+    # "Current Availability | Bed Space",
+    # "Current Availability | ICU Beds"
   ),
   options = layersControlOptions(collapsed = T)) %>% 
   ###how to get the layers of the legend to switch when selected
@@ -853,13 +874,58 @@ this.on('baselayerchange', e => updateLegend());
 ```
 
 
-Column {data-width=150, data-height=150}
+Column {data-width=150, data-height=350}
 -----------------------------------------------------------------------
 
-### Other Info., SIR Model
+### Cases Per Locality (Cumulative)
 
-```{r}
-plot(quil)
+
+
+```{r include=FALSE}
+dates<-select(data, matches("X2020")) %>% 
+  mutate(Nom=as.factor(data$Nom)) %>%
+  pivot_longer(
+    cols = starts_with("X2020"),
+    names_to = "date",
+    names_prefix = "X",
+    values_to = "rank",
+    values_drop_na = TRUE
+  ) %>% 
+  group_by(date) %>%
+  spread(Nom, rank) %>% 
+  ungroup() %>% 
+  mutate(
+    # Nom=as.factor(Nom),
+    date=as.Date(date, format= "%Y.%m.%d"))
+dates
+
+
+ay <- list(
+  #tickfont = list(color = "red"),
+  overlaying = "y",
+  side = "right"
+)
+
+p <- plot_ly() %>%
+  add_trace(x = dates$date, y = cumsum(dates$`Água Fria`), name = "Água Fria",type = "scatter", mode = "markers") %>%
+  add_trace(x = dates$date, y = cumsum(dates$`Alto Trombetas I`), name = "Alto Trombetas I",type = "scatter", mode = "markers") %>%
+  add_trace(x = dates$date, y = cumsum(dates$`Alto Trombetas I2`), name = "Alto Trombetas I2",type = "scatter", mode = "markers") %>%
+  add_trace(x = dates$date, y = cumsum(dates$`Alto Trombetas II`), name = "Alto Trombetas II",type = "scatter", mode = "markers") %>%
+  add_trace(x = dates$date, y = cumsum(dates$`Ariramba`),  name = "Ariramba",type = "scatter", mode = "markers") %>%
+  add_trace(x = dates$date, y = cumsum(dates$`Boa Vista`),  name = "Boa Vista",type = "scatter", mode = "markers") %>%
+  add_trace(x = dates$date, y = cumsum(dates$`Cachoeira Porteira`),  name = "Cachoeira Porteira",type = "scatter", mode = "markers") %>%
+  add_trace(x = dates$date, y = cumsum(dates$`Erepecuru`), name = "Erepecuru",type = "scatter", mode = "markers") %>%
+  add_trace(x = dates$date, y = cumsum(dates$`Trombetas`),  name = "Trombetas",type = "scatter", mode = "markers") %>%
+  layout(
+    title = "Cases Per Locality", yaxis2 = ay,
+    xaxis = list(title="Date", ticks=dates$date)
+  )
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+
+p
 
 ```
 
@@ -869,16 +935,17 @@ plot(quil)
 
 ```
 
-<b>Purpose of Map:</b>
+<b>About the Quilombola Community:</b>
+</br>A resilient Community in Brasil, responding to challenges of inequality and COVID-19 with strength and courage. 
 </br>
-</br>1. To provide near real-time information for community and strategic planning for community. .
-</br>2. enter text
+</br><b>Purpose of Dashboard:</b>
+</br>To provide near real-time information for community and strategic planning.
 </br>
-</br><i>Note:</i> A note here.
+</br>
+</br><i>Note:</i> data is located [**here**](https://docs.google.com/spreadsheets/d/1kVIMl-XB-QvM1zpP3N5Oi3dAKiShtlC43WjHn3IEjTg/edit?usp=sharing).
 </br>
 </br>
 <b>How to Use Map:</b>
-</br>
 </br>* Click on the map "icons" to display more information.
 </br>
 </br>* Hover over the map to highlight and display more information. 
@@ -888,16 +955,13 @@ plot(quil)
 </br>* Zoom in and out using "+" or "-" buttons at the top left of map, or by pressing and holding the "CNTRL" key and scrolling the wheel on your mouse up or down.
 </br>
 <br>
-<br>
+-----
 <br>
 </br><b>Data Sources:</b>
-</br>
 </br>* Quilombola Community data.
-</br>
-</br>* ECAM Team.
-</br>
-</br>
+</br>* [**ARQMO**](http://cpisp.org.br/quilombolas-em-oriximina/quem-sao-como-vivem/arqmo/) Team.
+</br>* [**ECAM**](http://ecam.org.br/en/) Team.
 </br>
 </br>
-</br>
-Updated on December 14, 2019
+
+Updated on `r Sys.Date()`
